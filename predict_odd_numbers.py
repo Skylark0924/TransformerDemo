@@ -6,6 +6,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from number_loader import NumberLoader
 from model import TransformerModel
+# import torch
+import numpy as np
+import pandas as pd
+from data_process import data_process
 
 
 def train(model, criterion, optimizer, loader):
@@ -46,6 +50,7 @@ def test(model, max_len=3, test_times=1):
         for i in range(test_times):
             s = random.randint(1, 4998)
             cpu_src = [(s + j) * 2 for j in range(max_len)]
+            # cpu_src = np.random.rand(3) * s
             src = LongTensor(cpu_src).unsqueeze(1).cuda()
             tgt = [0] + [(s + j) * 2 + 1 for j in range(max_len)]
             pred = [0]
@@ -61,16 +66,40 @@ def test(model, max_len=3, test_times=1):
 
 def main(model_name=None, hidden=64, nlayers=1):
     voc_size = 10000
+
     inp = arange(2, voc_size, 2)
     tgt = arange(3, voc_size, 2)
     batch_size = 128
     epochs = 30
-    dataset = NumberLoader(inp, tgt)
-    train_len = int(len(dataset) * 0.9)
-    val_len = len(dataset) - train_len
-    train_set, val_set = random_split(dataset, [train_len, val_len])
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=1)
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=1)
+
+    # inp = np.random.rand(int(voc_size / 2) -1) * voc_size
+    # tgt = np.random.rand(int(voc_size / 2) -1) * voc_size
+
+    delta_pos_l, delta_pos_r, rot_l, rot_r = data_process('./data/002-chen-04-dualarmstirfry')
+    val_delta_pos_l, val_delta_pos_r, val_rot_l, val_rot_r = data_process('./data/002-chen-03-dualarmstirfry')
+
+    data_l = delta_pos_l[0]
+    data_r = delta_pos_r[0]
+    val_data_l = val_delta_pos_l[0]
+    val_data_r = val_delta_pos_r[0]
+
+    inp = data_l.transpose()  # (1226, pose_dim)
+    tgt = data_r.transpose()  # (1226, pose_dim)
+    val_inp = val_data_l.transpose()  # (1226, pose_dim)
+    val_tgt = val_data_r.transpose()  # (1226, pose_dim)
+    #
+    # batch_size = 16
+    #
+    # epochs = 300
+    sequence_len = 3
+
+    dataset = NumberLoader(inp, tgt, inp_len=sequence_len, out_len=sequence_len)
+    # train_len = int(len(dataset) * 0.9)
+    # val_len = len(dataset) - train_len
+    # train_set, val_set = random_split(dataset, [train_len, val_len])
+    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+    val_dataset = NumberLoader(val_inp, val_tgt, inp_len=sequence_len, out_len=sequence_len)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
     model = TransformerModel(voc_size, voc_size, hidden=hidden, nlayers=nlayers)
     if model_name is not None:
         model.load_state_dict(load(model_name))
@@ -88,7 +117,7 @@ def main(model_name=None, hidden=64, nlayers=1):
         print("epoch: {} val loss: {}".format(i, epoch_loss_val))
         if epoch_loss_val < best_loss:
             best_loss = epoch_loss_val
-            model_name = "model/model_{0:.5f}.pt".format(epoch_loss_val)
+            model_name = "models/model_{0:.5f}.pt".format(epoch_loss_val)
             save(model.state_dict(), model_name)
     return model_name
 
@@ -107,6 +136,6 @@ if __name__ == "__main__":
             model_name = main(hidden=hidden, nlayers=nlayers)
     else:
         model_name = args.test_model
-    model = TransformerModel(10000, 10000, hidden=hidden, nlayers=nlayers)
-    model.load_state_dict(load(model_name))
-    test(model, test_times=10)
+    # model = TransformerModel(10000, 10000, hidden=hidden, nlayers=nlayers)
+    # model.load_state_dict(load(model_name))
+    # test(model, test_times=10)
