@@ -1,4 +1,6 @@
 import argparse
+import os
+
 from numpy import arange, random
 from torch import save, load, no_grad, LongTensor
 import torch.nn as nn
@@ -43,7 +45,7 @@ def validation(model, criterion, loader):
     return epoch_loss / len(loader)
 
 
-def test(model, max_len=3, test_times=1):
+def test(model, max_len=10, test_times=1):
     model = model.cuda()
     model.eval()
     with no_grad():
@@ -57,7 +59,8 @@ def test(model, max_len=3, test_times=1):
             for j in range(max_len):
                 inp = LongTensor(pred).unsqueeze(1).cuda()
                 output = model(src, inp)
-                out_num = output.argmax(2)[-1].item()
+                out_nums = output.argmax(2)
+                out_num = out_nums[-1].item()
                 pred.append(out_num)
             print("input: ", cpu_src)
             print("target: ", tgt)
@@ -75,31 +78,31 @@ def main(model_name=None, hidden=64, nlayers=1):
     # inp = np.random.rand(int(voc_size / 2) -1) * voc_size
     # tgt = np.random.rand(int(voc_size / 2) -1) * voc_size
 
-    delta_pos_l, delta_pos_r, rot_l, rot_r = data_process('./data/002-chen-04-dualarmstirfry')
-    val_delta_pos_l, val_delta_pos_r, val_rot_l, val_rot_r = data_process('./data/002-chen-03-dualarmstirfry')
+    # delta_pos_l, delta_pos_r, rot_l, rot_r = data_process('./data/002-chen-04-dualarmstirfry')
+    # val_delta_pos_l, val_delta_pos_r, val_rot_l, val_rot_r = data_process('./data/002-chen-03-dualarmstirfry')
 
-    data_l = delta_pos_l[0]
-    data_r = delta_pos_r[0]
-    val_data_l = val_delta_pos_l[0]
-    val_data_r = val_delta_pos_r[0]
-
-    inp = data_l.transpose()  # (1226, pose_dim)
-    tgt = data_r.transpose()  # (1226, pose_dim)
-    val_inp = val_data_l.transpose()  # (1226, pose_dim)
-    val_tgt = val_data_r.transpose()  # (1226, pose_dim)
+    # data_l = delta_pos_l[0]
+    # data_r = delta_pos_r[0]
+    # val_data_l = val_delta_pos_l[0]
+    # val_data_r = val_delta_pos_r[0]
+    #
+    # inp = data_l.transpose()  # (1226, pose_dim)
+    # tgt = data_r.transpose()  # (1226, pose_dim)
+    # val_inp = val_data_l.transpose()  # (1226, pose_dim)
+    # val_tgt = val_data_r.transpose()  # (1226, pose_dim)
     #
     # batch_size = 16
     #
     # epochs = 300
-    sequence_len = 3
+    sequence_len = 30
 
     dataset = NumberLoader(inp, tgt, inp_len=sequence_len, out_len=sequence_len)
-    # train_len = int(len(dataset) * 0.9)
-    # val_len = len(dataset) - train_len
-    # train_set, val_set = random_split(dataset, [train_len, val_len])
-    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
-    val_dataset = NumberLoader(val_inp, val_tgt, inp_len=sequence_len, out_len=sequence_len)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+    train_len = int(len(dataset) * 0.9)
+    val_len = len(dataset) - train_len
+    train_set, val_set = random_split(dataset, [train_len, val_len])
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=1)
+    # val_dataset = NumberLoader(val_inp, val_tgt, inp_len=sequence_len, out_len=sequence_len)
+    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=1)
     model = TransformerModel(voc_size, voc_size, hidden=hidden, nlayers=nlayers)
     if model_name is not None:
         model.load_state_dict(load(model_name))
@@ -124,7 +127,9 @@ def main(model_name=None, hidden=64, nlayers=1):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A PyTorch Transformer Language Model for Predicting Odd Numbers')
-    parser.add_argument('--test_model', type=str, help='the model file to load')
+    parser.add_argument('--test_model', type=str,
+                        default=os.path.join('./models/', sorted(os.listdir('./models/'))[0]),
+                        help='the model file to load')
     parser.add_argument('--train_model', type=str, help='the model file to load')
     args = parser.parse_args()
     hidden = 128
@@ -136,6 +141,6 @@ if __name__ == "__main__":
             model_name = main(hidden=hidden, nlayers=nlayers)
     else:
         model_name = args.test_model
-    # model = TransformerModel(10000, 10000, hidden=hidden, nlayers=nlayers)
-    # model.load_state_dict(load(model_name))
-    # test(model, test_times=10)
+    model = TransformerModel(10000, 10000, hidden=hidden, nlayers=nlayers)
+    model.load_state_dict(load(model_name))
+    test(model, max_len=15, test_times=10)
