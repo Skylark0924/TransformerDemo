@@ -30,7 +30,7 @@ def process_test(data_path):
     plt.show()
 
 
-def data_process(data_path):
+def data_process(data_path, aug=False):
     # For getting the delta of data
     df_left = pd.read_csv(os.path.join(data_path, '_slash_xsens_slash_left_tcp.csv'))
     df_right = pd.read_csv(os.path.join(data_path, '_slash_xsens_slash_right_tcp.csv'))
@@ -73,7 +73,43 @@ def data_process(data_path):
     rot_l = qxdata_l, qydata_l, qzdata_l, qwdata_l
     rot_r = qxdata_r, qydata_r, qzdata_r, qwdata_r
 
-    return delta_pos_l, delta_pos_r, rot_l, rot_r
+    data = [np.array(delta_pos_l), np.array(delta_pos_r), np.array(rot_l), np.array(rot_r)]
+
+    if aug:
+        all_data = None
+        for x_rate in range(5, 12):
+            aug_data = data_process_trans(data=data, x_rate=x_rate/10.)
+            if all_data is not None:
+                for item in range(len(aug_data)):
+                    all_data[item] = np.hstack((all_data[item], aug_data[item]))
+            else:
+                all_data = aug_data
+        data = all_data
+
+    return data
+
+
+def data_process_trans(data_path=None, data=None, x_rate=None, y_rate=None, z_rate=None):
+    if data_path is not None:
+        delta_pos_l, delta_pos_r, rot_l, rot_r = data_process(data_path)
+    elif data is not None:
+        delta_pos_l, delta_pos_r, rot_l, rot_r = data
+    else:
+        raise print('Something wrong')
+    delta_pos_l = list(delta_pos_l)
+    delta_pos_r = list(delta_pos_r)
+
+    if x_rate is not None:
+        delta_pos_l[0] *= x_rate
+        delta_pos_r[0] *= x_rate
+    if y_rate is not None:
+        delta_pos_l[1] *= y_rate
+        delta_pos_r[1] *= y_rate
+    if z_rate is not None:
+        delta_pos_l[2] *= z_rate
+        delta_pos_r[2] *= z_rate
+
+    return [np.array(delta_pos_l), np.array(delta_pos_r), np.array(rot_l), np.array(rot_r)]
 
 
 def manually_random_split(dataset, lengths, sequence_len, generator):
@@ -88,6 +124,6 @@ def manually_random_split(dataset, lengths, sequence_len, generator):
 
 
 if __name__ == '__main__':
-    # data_process('./data/002-chen-04-dualarmstirfry')
-    process_test('./data/002-chen-04-dualarmstirfry')
-    process_test('./data/002-chen-02-dualarmstirfry')
+    data_process('./data/002-chen-04-dualarmstirfry', aug=True)
+    # process_test('./data/002-chen-04-dualarmstirfry')
+    # process_test('./data/002-chen-02-dualarmstirfry')
